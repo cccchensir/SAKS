@@ -86,7 +86,7 @@ def get_graph_feature(x, k=20, idx=None):
 
 
 class SAKS(nn.Module):
-    def __init__(self, in_channels, out_channels, feat_channels, rank=4):
+    def __init__(self, in_channels, out_channels, feat_channels, rank=8):
         super(SAKS, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
