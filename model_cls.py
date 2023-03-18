@@ -107,7 +107,11 @@ class SAKS(nn.Module):
         self.leaky_relu = nn.LeakyReLU(negative_slope=0.2)
 
     def forward(self, x, y):
+        # x: (bs, in_channels, num_points, k), y: (bs, feat_channels, num_points, k)
+        batch_size, n_dims, num_points, k = x.size()
+
         pass
+        return x, corr_loss 
 
 
 class Net(nn.Module):
@@ -121,6 +125,13 @@ class Net(nn.Module):
         self.bn3 = nn.BatchNorm2d(128)
         self.bn4 = nn.BatchNorm2d(256)
         self.bn5 = nn.BatchNorm1d(args.emb_dims)
+
+        self.conv3 = nn.Sequential(nn.Conv2d(64 * 2, 128, kernel_size=1, bias=False),
+                                   self.bn3,
+                                   nn.LeakyReLU(negative_slope=0.2))
+        self.conv4 = nn.Sequential(nn.Conv2d(128 * 2, 256, kernel_size=1, bias=False),
+                                   self.bn4,
+                                   nn.LeakyReLU(negative_slope=0.2))
         self.conv5 = nn.Sequential(nn.Conv1d(512, args.emb_dims, kernel_size=1, bias=False),
                                    self.bn5,
                                    nn.LeakyReLU(negative_slope=0.2))
@@ -134,8 +145,6 @@ class Net(nn.Module):
 
         self.saks1 = SAKS(6, 64, 6)
         self.saks2 = SAKS(6, 64, 64 * 2)
-        self.saks3 = SAKS(6, 128, 64 * 2)
-        self.saks4 = SAKS(6, 256, 128 * 2)
 
     def forward(self, x):
         batch_size = x.size(0)
@@ -151,14 +160,12 @@ class Net(nn.Module):
         x, corr_loss2 = self.saks2(p, x)
         x2 = x.max(dim=-1, keepdim=False)[0]
 
-        x, idx = get_graph_feature(x2, k=self.k)
-        p, _ = get_graph_feature(points, k=self.k, idx=idx)
-        x, corr_loss3 = self.saks4(p, x)
+        x, _ = get_graph_feature(x2, k=self.k)
+        x = self.conv3(x)
         x3 = x.max(dim=-1, keepdim=False)[0]
 
-        x, idx = get_graph_feature(x3, k=self.k)
-        p, _ = get_graph_feature(points, k=self.k, idx=idx)
-        x, corr_loss4 = self.saks4(p, x)
+        x, _ = get_graph_feature(x3, k=self.k)
+        x = self.conv4(x)
         x4 = x.max(dim=-1, keepdim=False)[0]
 
         x = torch.cat((x1, x2, x3, x4), dim=1)
@@ -173,4 +180,4 @@ class Net(nn.Module):
         x = F.leaky_relu(self.bn7(self.linear2(x)), negative_slope=0.2)
         x = self.dp2(x)
         x = self.linear3(x)
-        return x
+        return x, corr_loss1 + corr_loss2
